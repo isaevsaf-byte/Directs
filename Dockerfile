@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy dependency files first (for caching)
-COPY pyproject.toml requirements.txt* ./
+COPY requirements.txt ./
 
 # Install Python dependencies
 # No need to install playwright browsers again; the base image has them.
