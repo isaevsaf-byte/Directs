@@ -45,6 +45,53 @@ function App() {
                         </div>
                     </section>
                 </div>
+                {/* Row 3: How It Works Legend */}
+                <section className="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+                    <h3 className="text-lg font-bold text-gray-800 mb-4">How This Dashboard Works</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm text-gray-600">
+
+                        {/* Data Sources */}
+                        <div>
+                            <h4 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-gray-800 inline-block"></span>
+                                Data Sources
+                            </h4>
+                            <p>
+                                Historical prices come from <strong>PIX Pulp Benchmark</strong> indices
+                                — the industry-standard reference for global pulp pricing.
+                                Data is collected automatically and updated as new indices are published.
+                            </p>
+                        </div>
+
+                        {/* Forecast */}
+                        <div>
+                            <h4 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-blue-500 inline-block"></span>
+                                Forward Curve (Forecast)
+                            </h4>
+                            <p>
+                                The colored forecast line shows <strong>forward-looking market expectations</strong> derived
+                                from traded pulp derivatives contracts. It reflects where the market expects
+                                prices to be over the coming months — not a prediction model, but real traded levels.
+                            </p>
+                        </div>
+
+                        {/* Spread */}
+                        <div>
+                            <h4 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-purple-500 inline-block"></span>
+                                Spread Monitor
+                            </h4>
+                            <p>
+                                The spread is the price gap between softwood (NBSK) and hardwood (BEK) pulp.
+                                <strong> Tight</strong> (&lt;$350) means prices are converging,
+                                <strong> Normal</strong> ($350–450) is the typical range, and
+                                <strong> Wide</strong> (&gt;$450) signals divergence.
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
             </main>
         </div>
     );
