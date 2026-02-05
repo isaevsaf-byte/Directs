@@ -57,9 +57,10 @@ function App() {
                                 Data Sources
                             </h4>
                             <p>
-                                Historical prices come from <strong>PIX Pulp Benchmark</strong> indices
-                                — the industry-standard reference for global pulp pricing.
-                                Data is collected automatically and updated as new indices are published.
+                                Historical prices (black line) come from <strong>Fastmarkets PIX</strong> — the
+                                industry-standard benchmark for global pulp pricing, published by
+                                Fastmarkets RISI. Data is collected automatically and updated as new
+                                indices are published.
                             </p>
                         </div>
 
@@ -70,9 +71,10 @@ function App() {
                                 Forward Curve (Forecast)
                             </h4>
                             <p>
-                                The colored forecast line shows <strong>forward-looking market expectations</strong> derived
-                                from traded pulp derivatives contracts. It reflects where the market expects
-                                prices to be over the coming months — not a prediction model, but real traded levels.
+                                The colored forecast line shows <strong>forward-looking market expectations</strong> sourced
+                                from <strong>CME/NOREXECO</strong> traded pulp derivatives contracts. It reflects where
+                                the market expects prices to be over the next 12 months — not a prediction
+                                model, but real traded settlement levels.
                             </p>
                         </div>
 
@@ -83,7 +85,8 @@ function App() {
                                 Spread Monitor
                             </h4>
                             <p>
-                                The spread is the price gap between softwood (NBSK) and hardwood (BEK) pulp.
+                                The spread is the price gap between softwood (NBSK) and hardwood (BEK) pulp,
+                                calculated from the forward curves above.
                                 <strong> Tight</strong> (&lt;$350) means prices are converging,
                                 <strong> Normal</strong> ($350–450) is the typical range, and
                                 <strong> Wide</strong> (&gt;$450) signals divergence.
