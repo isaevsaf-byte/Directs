@@ -21,8 +21,9 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy the rest of the application code
 COPY . .
 
-# Expose the port FastAPI will run on
-EXPOSE 8000
+# Railway injects $PORT at runtime; default to 8000 for local Docker
+ENV PORT=8000
+EXPOSE $PORT
 
-# Command to run the application (using the entrypoint we created)
-CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Use shell form so $PORT is expanded at runtime
+CMD uvicorn src.api.main:app --host 0.0.0.0 --port $PORT

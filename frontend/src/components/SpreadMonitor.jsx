@@ -1,19 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
-
-const API_BASE = 'http://localhost:8000';
-
-// Fetch curve data from API
-const fetchCurveData = async (product) => {
-    try {
-        const response = await fetch(`${API_BASE}/api/v1/market/curve/latest?product=${product}`);
-        if (!response.ok) throw new Error(`API error: ${response.status}`);
-        return await response.json();
-    } catch (error) {
-        console.error(`Error fetching ${product} curve:`, error);
-        return null;
-    }
-};
+import { fetchCurveData } from '../config/api';
 
 // Format date as "Jan'26"
 const formatDate = (dateStr) => {

@@ -5,6 +5,8 @@ from datetime import date, timedelta
 from typing import List, Optional
 import logging
 
+import os
+
 from src.db.schema import SessionLocal, init_db, MarketSnapshot, ForecastAccuracy
 from src.db.access import MarketRepository, ForecastRepository, RealizedPriceRepository
 from .excel_export import router as excel_router
@@ -17,9 +19,13 @@ init_db()
 app = FastAPI(title="Pulp Market Intelligence Hub", version="2026.2.0")
 
 # CORS for React Dashboard
+# Set CORS_ORIGINS env var to a comma-separated list, e.g. "https://my-app.vercel.app,https://custom.domain"
+cors_origins_env = os.environ.get("CORS_ORIGINS", "")
+cors_origins = [o.strip() for o in cors_origins_env.split(",") if o.strip()] if cors_origins_env else ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # In prod, restrict to dashboard domain
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

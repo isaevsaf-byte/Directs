@@ -1,0 +1,24 @@
+# Frontend (not needed in backend Docker image)
+frontend/
+node_modules/
+
+# Git
+.git/
+.gitignore
+
+# Dev files
+.env
+*.db
+*.sqlite3
+__pycache__/
+*.py[cod]
+.vscode/
+.idea/
+.DS_Store
+
+# Docker
+Dockerfile
+.dockerignore
+
+# Claude
+.claude/

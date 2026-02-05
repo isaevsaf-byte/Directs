@@ -100,8 +100,22 @@ class RealizedPrice(Base):
         return f"<RealizedPrice(date={self.price_date}, {self.product_type}=${self.price})>"
 
 # Database Connection Helper
-# In a real app, URL comes from env vars
-DB_URL = "sqlite:///./pulp_market.db" # Defaulting to SQLite for local dev ease, easily swapped for Postgres
+import os
+
+def get_database_url():
+    """Get database URL from environment or use SQLite for local dev."""
+    db_url = os.environ.get('DATABASE_URL')
+
+    if db_url:
+        # Railway/Heroku use postgres:// but SQLAlchemy needs postgresql://
+        if db_url.startswith('postgres://'):
+            db_url = db_url.replace('postgres://', 'postgresql://', 1)
+        return db_url
+
+    # Default to SQLite for local development
+    return "sqlite:///./pulp_market.db"
+
+DB_URL = get_database_url()
 engine = create_engine(DB_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
