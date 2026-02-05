@@ -121,7 +121,7 @@ export const SpreadMonitor = () => {
 
                     if (data.length > 0) {
                         const spreads = data.map(d => d.spread);
-                        setCurrentSpread(spreads[spreads.length - 1] || spreads[0]);
+                        setCurrentSpread(spreads[0]);
                         setStats({
                             min: Math.min(...spreads),
                             max: Math.max(...spreads),

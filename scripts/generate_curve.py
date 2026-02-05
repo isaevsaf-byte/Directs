@@ -51,6 +51,7 @@ def generate_nbsk_curve():
 
         # Create forward contracts from PIX data
         # These are the forward settlement prices from your Excel
+        # Extended to 12 months from today (through Feb 2027)
         contracts = [
             ContractBlock(date(2026, 2, 1), date(2026, 2, 28), 1545.0),
             ContractBlock(date(2026, 3, 1), date(2026, 3, 31), 1545.0),
@@ -62,6 +63,9 @@ def generate_nbsk_curve():
             ContractBlock(date(2026, 9, 1), date(2026, 9, 30), 1571.0),
             ContractBlock(date(2026, 10, 1), date(2026, 10, 31), 1565.0),
             ContractBlock(date(2026, 11, 1), date(2026, 11, 30), 1565.0),
+            ContractBlock(date(2026, 12, 1), date(2026, 12, 31), 1560.0),
+            ContractBlock(date(2027, 1, 1), date(2027, 1, 31), 1558.0),
+            ContractBlock(date(2027, 2, 1), date(2027, 2, 28), 1555.0),
         ]
 
         print(f"\nForward Contracts ({len(contracts)} months):")
@@ -145,6 +149,7 @@ def generate_bek_curve():
         print(f"\nSpot Price: ${spot_price:.2f} on {spot_date}")
 
         # Forward contracts from Excel
+        # Extended to 12 months from today (through Feb 2027)
         contracts = [
             ContractBlock(date(2026, 1, 1), date(2026, 1, 31), 1140.0),
             ContractBlock(date(2026, 2, 1), date(2026, 2, 28), 1140.0),
@@ -157,6 +162,9 @@ def generate_bek_curve():
             ContractBlock(date(2026, 9, 1), date(2026, 9, 30), 1204.0),
             ContractBlock(date(2026, 10, 1), date(2026, 10, 31), 1230.0),
             ContractBlock(date(2026, 11, 1), date(2026, 11, 30), 1230.0),
+            ContractBlock(date(2026, 12, 1), date(2026, 12, 31), 1245.0),
+            ContractBlock(date(2027, 1, 1), date(2027, 1, 31), 1255.0),
+            ContractBlock(date(2027, 2, 1), date(2027, 2, 28), 1260.0),
         ]
 
         print(f"\nForward Contracts ({len(contracts)} months):")

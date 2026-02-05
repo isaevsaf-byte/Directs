@@ -25,15 +25,17 @@ const generateFallbackData = (product) => {
         '2025-09': 1000, '2025-10': 1051.6, '2025-11': 1075.19, '2025-12': 1096.33
     };
 
-    // Forward prices from Excel
+    // Forward prices from Excel (12 months out to Feb 2027)
     const forwardPrices = product === 'NBSK' ? {
-        '2026-01': 1545, '2026-02': 1545, '2026-03': 1545, '2026-04': 1562,
+        '2026-02': 1545, '2026-03': 1545, '2026-04': 1562,
         '2026-05': 1562, '2026-06': 1562, '2026-07': 1571, '2026-08': 1571,
-        '2026-09': 1571, '2026-10': 1565, '2026-11': 1565
+        '2026-09': 1571, '2026-10': 1565, '2026-11': 1565,
+        '2026-12': 1560, '2027-01': 1558, '2027-02': 1555
     } : {
-        '2026-01': 1140, '2026-02': 1140, '2026-03': 1140, '2026-04': 1180,
+        '2026-02': 1140, '2026-03': 1140, '2026-04': 1180,
         '2026-05': 1180, '2026-06': 1180, '2026-07': 1204, '2026-08': 1204,
-        '2026-09': 1204, '2026-10': 1230, '2026-11': 1230
+        '2026-09': 1204, '2026-10': 1230, '2026-11': 1230,
+        '2026-12': 1245, '2027-01': 1255, '2027-02': 1260
     };
 
     // Add historical data
@@ -75,14 +77,23 @@ const generateFallbackData = (product) => {
 };
 
 // Process API data into chart format
+// Ensures history and forecast lines don't overlap:
+//   - actualPrice: only for months up to and including this month
+//   - forecastPrice: only for months from this month onward
+//   - They share one "connector" month so the lines visually meet
 const processApiData = (realizedPrices, forecastCurve) => {
     const monthlyData = {};
+    const now = new Date();
+    const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-    // Process realized prices (history)
+    // Process realized prices (history) — only past & current month
     if (realizedPrices && realizedPrices.length > 0) {
         realizedPrices.forEach(item => {
             const d = new Date(item.date);
             const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+
+            // Skip future realized prices (shouldn't exist, but be safe)
+            if (monthKey > currentMonthKey) return;
 
             if (!monthlyData[monthKey] || d.getDate() === 15) {
                 monthlyData[monthKey] = {
@@ -96,24 +107,37 @@ const processApiData = (realizedPrices, forecastCurve) => {
         });
     }
 
-    // Process forecast curve
+    // Process forecast curve — only current month onward
     if (forecastCurve && forecastCurve.length > 0) {
+        // Pick one price per month (first of month or mid-month)
+        const monthlyForecast = {};
         forecastCurve.forEach(item => {
             const d = new Date(item.date);
             const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 
+            // Only include current month and future
+            if (monthKey < currentMonthKey) return;
+
+            if (!monthlyForecast[monthKey] || d.getDate() === 1 || d.getDate() === 15) {
+                monthlyForecast[monthKey] = { date: item.date, price: item.price };
+            }
+        });
+
+        Object.entries(monthlyForecast).forEach(([monthKey, { date: itemDate, price }]) => {
+            const d = new Date(itemDate);
+
             if (!monthlyData[monthKey]) {
+                // Pure forecast month (no history here)
                 monthlyData[monthKey] = {
-                    date: formatDate(item.date),
+                    date: formatDate(itemDate),
                     type: 'forecast',
                     actualPrice: null,
-                    forecastPrice: Math.round(item.price),
+                    forecastPrice: Math.round(price),
                     timestamp: d.getTime()
                 };
             } else if (monthlyData[monthKey].type === 'actual') {
-                monthlyData[monthKey].forecastPrice = Math.round(item.price);
-            } else if (d.getDate() === 1) {
-                monthlyData[monthKey].forecastPrice = Math.round(item.price);
+                // Connector month: history meets forecast
+                monthlyData[monthKey].forecastPrice = Math.round(price);
             }
         });
     }
