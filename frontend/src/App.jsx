@@ -48,19 +48,22 @@ function App() {
                 {/* Row 3: How It Works Legend */}
                 <section className="bg-white p-6 rounded-lg shadow-md border border-gray-200">
                     <h3 className="text-lg font-bold text-gray-800 mb-4">How This Dashboard Works</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm text-gray-600">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-gray-600">
 
                         {/* Data Sources */}
                         <div>
                             <h4 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
                                 <span className="w-2 h-2 rounded-full bg-gray-800 inline-block"></span>
-                                Data Sources
+                                Historical Data (Black Line)
                             </h4>
+                            <p className="mb-2">
+                                <strong>Source:</strong> Fastmarkets PIX indices — the industry-standard benchmark
+                                for global pulp pricing, published by Fastmarkets RISI.
+                            </p>
                             <p>
-                                Historical prices (black line) come from <strong>Fastmarkets PIX</strong> — the
-                                industry-standard benchmark for global pulp pricing, published by
-                                Fastmarkets RISI. Data is collected automatically and updated as new
-                                indices are published.
+                                <strong>What we do:</strong> We automatically collect and store monthly PIX settlement
+                                prices for NBSK (softwood) and BEK (hardwood) pulp. This historical data serves as
+                                ground truth for tracking market movements.
                             </p>
                         </div>
 
@@ -68,13 +71,17 @@ function App() {
                         <div>
                             <h4 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
                                 <span className="w-2 h-2 rounded-full bg-blue-500 inline-block"></span>
-                                Forward Curve (Forecast)
+                                Forward Curve (Colored Line)
                             </h4>
+                            <p className="mb-2">
+                                <strong>Source:</strong> CME/NOREXECO traded pulp derivatives — real settlement prices
+                                from monthly futures contracts, not predictions.
+                            </p>
                             <p>
-                                The colored forecast line shows <strong>forward-looking market expectations</strong> sourced
-                                from <strong>CME/NOREXECO</strong> traded pulp derivatives contracts. It reflects where
-                                the market expects prices to be over the next 12 months — not a prediction
-                                model, but real traded settlement levels.
+                                <strong>What we do:</strong> We take monthly contract prices and apply a
+                                <strong> maximum smoothness spline</strong> algorithm to generate a smooth daily curve.
+                                The spline minimizes curvature while ensuring the average price in each contract period
+                                matches the traded settlement level — this is called <em>arbitrage-free</em> curve construction.
                             </p>
                         </div>
 
@@ -85,11 +92,23 @@ function App() {
                                 Spread Monitor
                             </h4>
                             <p>
-                                The spread is the price gap between softwood (NBSK) and hardwood (BEK) pulp,
-                                calculated from the forward curves above.
-                                <strong> Tight</strong> (&lt;$350) means prices are converging,
-                                <strong> Normal</strong> ($350–450) is the typical range, and
-                                <strong> Wide</strong> (&gt;$450) signals divergence.
+                                The spread is NBSK minus BEK from the forward curves.
+                                <strong> Tight</strong> (&lt;$350) = prices converging,
+                                <strong> Normal</strong> ($350–450) = typical range,
+                                <strong> Wide</strong> (&gt;$450) = divergence.
+                            </p>
+                        </div>
+
+                        {/* Data Pipeline */}
+                        <div>
+                            <h4 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-green-500 inline-block"></span>
+                                Data Pipeline
+                            </h4>
+                            <p>
+                                Data flows: <strong>Sources → Scraper → PostgreSQL → API → Dashboard</strong>.
+                                Historical PIX and forward contracts are stored with timestamps, enabling
+                                "time machine" queries to see how the curve looked on any past date.
                             </p>
                         </div>
                     </div>
