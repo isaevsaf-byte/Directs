@@ -1,7 +1,7 @@
 """
 Excel Export API - Phase 2: Power Query Integration
 
-Provides CSV streaming endpoints optimized for Excel Power Query.
+Provides XLSX streaming endpoints optimized for Excel.
 Uses token-based authentication via query parameter (Power Query friendly).
 """
 
@@ -11,10 +11,10 @@ from sqlalchemy.orm import Session
 from src.db.schema import SessionLocal
 from src.db.access import MarketRepository, RealizedPriceRepository
 from datetime import date
-import csv
 import io
 import os
 import logging
+import xlsxwriter
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +68,7 @@ def build_flat_table(db: Session) -> list:
 
         for price_date, price in realized_prices.items():
             rows.append({
-                "Date": price_date.strftime("%Y-%m-%d"),
+                "Date": price_date,
                 "Ticker": product,
                 "Price": round(float(price), 2),
                 "Type": "Actual"
@@ -82,7 +82,7 @@ def build_flat_table(db: Session) -> list:
         for snapshot in curve:
             if snapshot.contract_date >= today:
                 rows.append({
-                    "Date": snapshot.contract_date.strftime("%Y-%m-%d"),
+                    "Date": snapshot.contract_date,
                     "Ticker": product,
                     "Price": round(float(snapshot.price), 2),
                     "Type": "Forecast"
@@ -94,73 +94,135 @@ def build_flat_table(db: Session) -> list:
     return rows
 
 
-def generate_csv_stream(rows: list):
+def create_xlsx_file(rows: list, sheet_name: str = "Data") -> io.BytesIO:
     """
-    Generator function for streaming CSV output.
-    Memory efficient - doesn't hold entire file in memory.
+    Create an XLSX file in memory from row data.
+    Returns a BytesIO buffer containing the Excel file.
     """
-    output = io.StringIO()
-    writer = csv.DictWriter(output, fieldnames=["Date", "Ticker", "Price", "Type"])
+    output = io.BytesIO()
 
-    # Write header
-    writer.writeheader()
-    yield output.getvalue()
+    workbook = xlsxwriter.Workbook(output, {'in_memory': True})
+    worksheet = workbook.add_worksheet(sheet_name)
+
+    # Define formats
+    header_format = workbook.add_format({
+        'bold': True,
+        'bg_color': '#4472C4',
+        'font_color': 'white',
+        'border': 1,
+        'align': 'center'
+    })
+
+    date_format = workbook.add_format({
+        'num_format': 'yyyy-mm-dd',
+        'border': 1
+    })
+
+    price_format = workbook.add_format({
+        'num_format': '#,##0.00',
+        'border': 1
+    })
+
+    text_format = workbook.add_format({
+        'border': 1
+    })
+
+    actual_format = workbook.add_format({
+        'border': 1,
+        'bg_color': '#E2EFDA',  # Light green for actuals
+    })
+
+    forecast_format = workbook.add_format({
+        'border': 1,
+        'bg_color': '#DDEBF7',  # Light blue for forecasts
+    })
+
+    # Write headers
+    headers = ["Date", "Ticker", "Price", "Type"]
+    for col, header in enumerate(headers):
+        worksheet.write(0, col, header, header_format)
+
+    # Write data rows
+    for row_idx, row_data in enumerate(rows, start=1):
+        # Choose row color based on type
+        type_val = row_data["Type"]
+        bg_format = actual_format if type_val == "Actual" else forecast_format
+
+        # Date column
+        worksheet.write_datetime(row_idx, 0, row_data["Date"], date_format)
+        # Ticker column
+        worksheet.write(row_idx, 1, row_data["Ticker"], bg_format)
+        # Price column
+        worksheet.write_number(row_idx, 2, row_data["Price"], price_format)
+        # Type column
+        worksheet.write(row_idx, 3, row_data["Type"], bg_format)
+
+    # Set column widths
+    worksheet.set_column('A:A', 12)  # Date
+    worksheet.set_column('B:B', 8)   # Ticker
+    worksheet.set_column('C:C', 12)  # Price
+    worksheet.set_column('D:D', 10)  # Type
+
+    # Add autofilter
+    worksheet.autofilter(0, 0, len(rows), 3)
+
+    # Freeze header row
+    worksheet.freeze_panes(1, 0)
+
+    workbook.close()
     output.seek(0)
-    output.truncate(0)
 
-    # Write rows one at a time
-    for row in rows:
-        writer.writerow(row)
-        yield output.getvalue()
-        output.seek(0)
-        output.truncate(0)
+    return output
 
 
 @router.get("/excel/forecast")
-def export_forecast_csv(
-    token: str = Query(..., description="API token for Power Query access"),
+def export_forecast_xlsx(
+    token: str = Query(..., description="API token for Excel export access"),
     db: Session = Depends(get_db)
 ):
     """
-    Export combined Historical + Forecast data as CSV for Excel/Power Query.
+    Export combined Historical + Forecast data as XLSX for Excel.
 
-    **Authentication:** Pass token as query parameter (Power Query compatible).
+    **Authentication:** Pass token as query parameter.
 
     **Columns:**
-    - Date: YYYY-MM-DD format
+    - Date: Excel date format
     - Ticker: NBSK or BEK
     - Price: Float with 2 decimal places
     - Type: "Actual" (historical PIX) or "Forecast" (forward curve)
 
-    **Usage in Excel Power Query:**
-    ```
-    = Csv.Document(Web.Contents("https://your-api.com/api/v1/export/excel/forecast?token=YOUR_TOKEN"))
-    ```
+    **Features:**
+    - Formatted headers with filters
+    - Color-coded rows (green=Actual, blue=Forecast)
+    - Frozen header row
+    - Ready for Pivot Tables
     """
     verify_token(token)
 
-    logger.info("Excel export requested - building flat table")
+    logger.info("Excel XLSX export requested - building flat table")
     rows = build_flat_table(db)
-    logger.info(f"Excel export: {len(rows)} rows prepared for streaming")
+    logger.info(f"Excel export: {len(rows)} rows prepared")
+
+    xlsx_buffer = create_xlsx_file(rows, "Pulp Forecast Data")
 
     return StreamingResponse(
-        generate_csv_stream(rows),
-        media_type="text/csv",
+        xlsx_buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={
-            "Content-Disposition": "attachment; filename=pulp_forecast_data.csv",
+            "Content-Disposition": "attachment; filename=pulp_forecast_data.xlsx",
             "Cache-Control": "no-cache"
         }
     )
 
 
 @router.get("/excel/historical")
-def export_historical_csv(
-    token: str = Query(..., description="API token for Power Query access"),
+def export_historical_xlsx(
+    token: str = Query(..., description="API token for Excel export access"),
     product: str = Query(default="NBSK", description="Product: NBSK or BEK"),
     db: Session = Depends(get_db)
 ):
     """
-    Export historical PIX prices only as CSV.
+    Export historical PIX prices only as XLSX.
 
     Useful for historical analysis without forecast data.
     """
@@ -171,7 +233,7 @@ def export_historical_csv(
 
     rows = [
         {
-            "Date": price_date.strftime("%Y-%m-%d"),
+            "Date": price_date,
             "Ticker": product,
             "Price": round(float(price), 2),
             "Type": "Actual"
@@ -180,24 +242,26 @@ def export_historical_csv(
     ]
     rows.sort(key=lambda x: x["Date"])
 
+    xlsx_buffer = create_xlsx_file(rows, f"{product} Historical")
+
     return StreamingResponse(
-        generate_csv_stream(rows),
-        media_type="text/csv",
+        xlsx_buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={
-            "Content-Disposition": f"attachment; filename={product}_historical.csv",
+            "Content-Disposition": f"attachment; filename={product}_historical.xlsx",
             "Cache-Control": "no-cache"
         }
     )
 
 
 @router.get("/excel/curve")
-def export_curve_csv(
-    token: str = Query(..., description="API token for Power Query access"),
+def export_curve_xlsx(
+    token: str = Query(..., description="API token for Excel export access"),
     product: str = Query(default="NBSK", description="Product: NBSK or BEK"),
     db: Session = Depends(get_db)
 ):
     """
-    Export the latest forward curve only as CSV.
+    Export the latest forward curve only as XLSX.
 
     Includes daily interpolated prices from the spline.
     """
@@ -208,7 +272,7 @@ def export_curve_csv(
 
     rows = [
         {
-            "Date": s.contract_date.strftime("%Y-%m-%d"),
+            "Date": s.contract_date,
             "Ticker": product,
             "Price": round(float(s.price), 2),
             "Type": "Forecast"
@@ -216,57 +280,53 @@ def export_curve_csv(
         for s in curve
     ]
 
+    xlsx_buffer = create_xlsx_file(rows, f"{product} Forward Curve")
+
     return StreamingResponse(
-        generate_csv_stream(rows),
-        media_type="text/csv",
+        xlsx_buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={
-            "Content-Disposition": f"attachment; filename={product}_curve.csv",
+            "Content-Disposition": f"attachment; filename={product}_curve.xlsx",
             "Cache-Control": "no-cache"
         }
     )
 
 
-# Keep the legacy endpoint for backward compatibility
-@router.get("/forecast/excel", deprecated=True)
-def export_excel_csv_legacy(
-    token: str = Query(..., description="API Key for Power Query Access"),
-    product: str = "NBSK",
+# CSV endpoint for backward compatibility
+@router.get("/csv/forecast")
+def export_forecast_csv(
+    token: str = Query(..., description="API token for export access"),
     db: Session = Depends(get_db)
 ):
     """
-    [DEPRECATED] Use /api/v1/export/excel/forecast instead.
-
-    Legacy endpoint - streams curve data for a single product.
+    Export combined Historical + Forecast data as CSV (legacy format).
     """
+    import csv
+
     verify_token(token)
+    rows = build_flat_table(db)
 
-    repo = MarketRepository(db)
-    snapshots = repo.get_latest_curve(product)
-
-    def iter_csv():
+    def generate_csv():
         output = io.StringIO()
-        writer = csv.writer(output)
-
-        writer.writerow(["Snapshot Date", "Contract Date", "Product", "Price", "Type"])
+        writer = csv.DictWriter(output, fieldnames=["Date", "Ticker", "Price", "Type"])
+        writer.writeheader()
         yield output.getvalue()
         output.seek(0)
         output.truncate(0)
 
-        for row in snapshots:
-            row_type = "Spline" if row.is_interpolated else "Raw Block"
-            writer.writerow([
-                row.snapshot_date,
-                row.contract_date,
-                row.product_type,
-                row.price,
-                row_type
-            ])
+        for row in rows:
+            row_copy = row.copy()
+            row_copy["Date"] = row_copy["Date"].strftime("%Y-%m-%d")
+            writer.writerow(row_copy)
             yield output.getvalue()
             output.seek(0)
             output.truncate(0)
 
     return StreamingResponse(
-        iter_csv(),
+        generate_csv(),
         media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename={product}_forecast.csv"}
+        headers={
+            "Content-Disposition": "attachment; filename=pulp_forecast_data.csv",
+            "Cache-Control": "no-cache"
+        }
     )
