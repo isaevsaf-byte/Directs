@@ -14,15 +14,17 @@ const formatDate = (dateStr) => {
 const generateFallbackData = (product) => {
     const data = [];
 
-    // Actual PIX prices from Excel for history
+    // Actual PIX prices from Excel for history (12 months: Feb 2025 - Jan 2026)
     const historicalPrices = product === 'NBSK' ? {
-        '2025-01': 1480.5, '2025-02': 1493.7, '2025-03': 1532.1, '2025-04': 1573.8,
+        '2025-02': 1493.7, '2025-03': 1532.1, '2025-04': 1573.8,
         '2025-05': 1597.1, '2025-06': 1572.7, '2025-07': 1527.8, '2025-08': 1499.97,
-        '2025-09': 1495.91, '2025-10': 1496.89, '2025-11': 1497.58, '2025-12': 1498.20
+        '2025-09': 1495.91, '2025-10': 1496.89, '2025-11': 1497.58, '2025-12': 1498.20,
+        '2026-01': 1545.0
     } : {
-        '2025-01': 1000, '2025-02': 1066.54, '2025-03': 1142.4, '2025-04': 1195.5,
+        '2025-02': 1066.54, '2025-03': 1142.4, '2025-04': 1195.5,
         '2025-05': 1193.5, '2025-06': 1137.8, '2025-07': 1079.7, '2025-08': 1013.37,
-        '2025-09': 1000, '2025-10': 1051.6, '2025-11': 1075.19, '2025-12': 1096.33
+        '2025-09': 1000, '2025-10': 1051.6, '2025-11': 1075.19, '2025-12': 1096.33,
+        '2026-01': 1140.0
     };
 
     // Forward prices from Excel (12 months out to Feb 2027)
@@ -78,15 +80,19 @@ const generateFallbackData = (product) => {
 
 // Process API data into chart format
 // Ensures history and forecast lines don't overlap:
-//   - actualPrice: only for months up to and including this month
-//   - forecastPrice: only for months from this month onward
+//   - actualPrice: only for the last 12 months up to and including this month
+//   - forecastPrice: only for months from this month onward (12 months forward)
 //   - They share one "connector" month so the lines visually meet
 const processApiData = (realizedPrices, forecastCurve) => {
     const monthlyData = {};
     const now = new Date();
     const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-    // Process realized prices (history) — only past & current month
+    // Calculate 12 months ago cutoff for history
+    const twelveMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+    const historyStartKey = `${twelveMonthsAgo.getFullYear()}-${String(twelveMonthsAgo.getMonth() + 1).padStart(2, '0')}`;
+
+    // Process realized prices (history) — only last 12 months up to current month
     if (realizedPrices && realizedPrices.length > 0) {
         realizedPrices.forEach(item => {
             const d = new Date(item.date);
@@ -94,6 +100,9 @@ const processApiData = (realizedPrices, forecastCurve) => {
 
             // Skip future realized prices (shouldn't exist, but be safe)
             if (monthKey > currentMonthKey) return;
+
+            // Skip history older than 12 months
+            if (monthKey < historyStartKey) return;
 
             if (!monthlyData[monthKey] || d.getDate() === 15) {
                 monthlyData[monthKey] = {
