@@ -1,7 +1,10 @@
 // API Configuration
-// Uses environment variable in production, localhost in development
+// Uses environment variable first, then Railway production URL, then localhost for dev
 
-export const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const PRODUCTION_API = 'https://web-production-bbcf1.up.railway.app';
+
+export const API_BASE = import.meta.env.VITE_API_URL
+    || (import.meta.env.PROD ? PRODUCTION_API : 'http://localhost:8000');
 
 // Helper to make API calls
 export const fetchAPI = async (endpoint, options = {}) => {
