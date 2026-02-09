@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -10,13 +11,32 @@ import os
 from src.db.schema import SessionLocal, init_db, MarketSnapshot, ForecastAccuracy
 from src.db.access import MarketRepository, ForecastRepository, RealizedPriceRepository
 from .excel_export import router as excel_router
+from .scheduler_routes import router as scheduler_router
+from src.scheduler import create_scheduler
 
 logger = logging.getLogger(__name__)
 
 # Initialize DB (In real app, use Alembic)
 init_db()
 
-app = FastAPI(title="Pulp Market Intelligence Hub", version="2026.2.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: launch scheduler
+    sched = create_scheduler()
+    sched.start()
+    logger.info("Scheduler started (daily 18:00 UTC, weekly Tue 08:00 UTC)")
+    yield
+    # Shutdown: stop scheduler
+    sched.shutdown(wait=False)
+    logger.info("Scheduler stopped")
+
+
+app = FastAPI(
+    title="Pulp Market Intelligence Hub",
+    version="2026.3.0",
+    lifespan=lifespan,
+)
 
 # CORS for React Dashboard
 # Set CORS_ORIGINS env var to a comma-separated list, e.g. "https://my-app.vercel.app,https://custom.domain"
@@ -33,6 +53,7 @@ app.add_middleware(
 
 # Include specialized routers
 app.include_router(excel_router)
+app.include_router(scheduler_router)
 
 
 # Dependency
@@ -46,7 +67,14 @@ def get_db():
 
 @app.get("/")
 def health_check():
-    return {"status": "ok", "system": "Pulp Market Intelligence Hub", "version": "2026.2.0"}
+    from src.scheduler import get_scheduler_status
+    sched_status = get_scheduler_status()
+    return {
+        "status": "ok",
+        "system": "Pulp Market Intelligence Hub",
+        "version": "2026.3.0",
+        "scheduler": sched_status.get("status", "unknown"),
+    }
 
 
 @app.get("/api/v1/market/curve/latest", response_model=List[dict])

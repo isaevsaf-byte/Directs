@@ -9,3 +9,6 @@ pydantic
 requests
 python-multipart
 xlsxwriter
+apscheduler>=3.10,<4
+statsmodels
+arch

@@ -61,13 +61,13 @@ function App() {
                                 for global pulp pricing, published by Fastmarkets RISI.
                             </p>
                             <p>
-                                <strong>What we do:</strong> We automatically collect and store monthly PIX settlement
-                                prices for NBSK (softwood) and BEK (hardwood) pulp. This historical data serves as
-                                ground truth for tracking market movements.
+                                <strong>What we do:</strong> Monthly PIX settlement prices for NBSK (softwood) and
+                                BEK (hardwood) are collected and stored. Forecast accuracy is automatically
+                                validated against new PIX actuals every <strong>Tuesday at 08:00 UTC</strong>.
                             </p>
                         </div>
 
-                        {/* Forecast */}
+                        {/* Forward Curve */}
                         <div>
                             <h4 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
                                 <span className="w-2 h-2 rounded-full bg-blue-500 inline-block"></span>
@@ -75,13 +75,33 @@ function App() {
                             </h4>
                             <p className="mb-2">
                                 <strong>Source:</strong> CME/NOREXECO traded pulp derivatives — real settlement prices
-                                from monthly futures contracts, not predictions.
+                                from monthly futures contracts, scraped automatically <strong>daily at 18:00 UTC</strong> after
+                                European market close.
                             </p>
                             <p>
-                                <strong>What we do:</strong> We take monthly contract prices and apply a
+                                <strong>What we do:</strong> Monthly contract prices are fed through a
                                 <strong> maximum smoothness spline</strong> algorithm to generate a smooth daily curve.
                                 The spline minimizes curvature while ensuring the average price in each contract period
-                                matches the traded settlement level — this is called <em>arbitrage-free</em> curve construction.
+                                matches the traded settlement level — <em>arbitrage-free</em> curve construction.
+                            </p>
+                        </div>
+
+                        {/* Ensemble Forecast */}
+                        <div>
+                            <h4 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-orange-500 inline-block"></span>
+                                Ensemble Forecast
+                            </h4>
+                            <p className="mb-2">
+                                Three models are combined with horizon-adjusted weights:
+                                <strong> Futures Curve</strong> (market-implied prices),
+                                <strong> ARIMA</strong> (momentum and autoregression), and
+                                <strong> Mean Reversion</strong> (pull toward long-term equilibrium).
+                            </p>
+                            <p>
+                                Near-term (&lt;30d) trusts futures most (60%), long-term (&gt;90d) leans on
+                                mean reversion (40%). Predictions are stored daily and scored against
+                                PIX actuals to track MAPE and bias.
                             </p>
                         </div>
 
@@ -99,16 +119,17 @@ function App() {
                             </p>
                         </div>
 
-                        {/* Data Pipeline */}
-                        <div>
+                        {/* Automated Pipeline */}
+                        <div className="md:col-span-2 border-t border-gray-100 pt-4">
                             <h4 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
                                 <span className="w-2 h-2 rounded-full bg-green-500 inline-block"></span>
-                                Data Pipeline
+                                Automated Pipeline
                             </h4>
                             <p>
-                                Data flows: <strong>Sources → Scraper → PostgreSQL → API → Dashboard</strong>.
-                                Historical PIX and forward contracts are stored with timestamps, enabling
-                                "time machine" queries to see how the curve looked on any past date.
+                                <strong>Daily 18:00 UTC:</strong> Scrape NOREXECO contracts → Build spline curves →
+                                Run ensemble forecast → Validate against actuals.
+                                <strong> Weekly Tue 08:00 UTC:</strong> Re-validate pending forecasts against
+                                newly published PIX prices. All snapshots are timestamped for "time machine" queries.
                             </p>
                         </div>
                     </div>
