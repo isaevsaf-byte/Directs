@@ -28,14 +28,11 @@ class MarketContract(BaseModel):
     @classmethod
     def validate_ticker(cls, v: str) -> str:
         v = v.upper().strip()
-        # 2026 Protocol: Reject BHKP, Accept BEK
-        if "BHKP" in v:
-            raise ValueError(f"Legacy Ticker Detected: {v}. BHKP is suspended.")
-        
-        # Ensure it matches expected patterns roughly
-        if not re.search(r'(NBSK|BEK|EUCALYPTUS)', v):
+
+        # Accept NBSK, BEK, BHKP (hardwood), and EUCALYPTUS tickers
+        if not re.search(r'(NBSK|BEK|BHKP|EUCALYPTUS)', v):
              raise ValueError(f"Unknown Contract Type in ticker: {v}")
-        
+
         return v
 
 class ReferenceData(BaseModel):

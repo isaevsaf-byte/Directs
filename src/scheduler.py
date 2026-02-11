@@ -19,7 +19,6 @@ from apscheduler.triggers.cron import CronTrigger
 from src.db.schema import init_db, SessionLocal, MarketSnapshot
 from src.db.access import MarketRepository, RealizedPriceRepository, ForecastRepository
 from src.etl.scraper import HybridScraper
-from src.etl.reference_data import ReferenceDataLoader
 from src.math.spline import MaximumSmoothnessSpline, ContractBlock, SplineBounds, create_blocks_from_market_contracts
 from sqlalchemy import delete
 
@@ -65,10 +64,7 @@ async def scrape_norexco() -> List:
     _record("scrape_norexco", "running")
 
     try:
-        ref_loader = ReferenceDataLoader()
-        ref_loader.fetch()
-
-        scraper = HybridScraper(ref_loader)
+        scraper = HybridScraper()
         contracts = await scraper.run()
 
         if not contracts:
@@ -116,32 +112,36 @@ def generate_curves_from_contracts(contracts: list) -> bool:
                 blocks = create_blocks_from_market_contracts(product_contracts)
                 spot_price = product_contracts[0].price  # nearest contract as anchor
             else:
-                # --- fallback: rebuild from latest realized prices ---
-                logger.info(f"SCHEDULER: No scraped {product} contracts, falling back to DB")
-                realized = realized_repo.get_realized_prices(product)
-                if len(realized) == 0:
-                    logger.warning(f"SCHEDULER: No data at all for {product}, skipping")
+                # --- fallback: keep existing curve instead of overwriting with flat data ---
+                existing_curve = market_repo.get_latest_curve(product)
+                if existing_curve:
+                    logger.info(f"SCHEDULER: No scraped {product} contracts, keeping existing curve ({len(existing_curve)} points)")
                     continue
-
-                spot_price = float(realized.iloc[-1])
-                blocks = _build_fallback_blocks(product, realized)
+                logger.warning(f"SCHEDULER: No scraped {product} contracts and no existing curve, skipping")
+                continue
 
             if not blocks:
                 logger.warning(f"SCHEDULER: No contract blocks for {product}")
                 continue
 
             # Determine bounds per product
+            # Norexco spot-based futures (Dec 2025+): lower price levels than old PIX/DAP contracts
             if product == "NBSK":
-                bounds = SplineBounds(min_price=1400, max_price=1700)
+                bounds = SplineBounds(min_price=500, max_price=1200)
             else:
-                bounds = SplineBounds(min_price=1000, max_price=1400)
+                bounds = SplineBounds(min_price=400, max_price=1000)
 
             try:
                 spline = MaximumSmoothnessSpline(snapshot_date, spot_price, bounds)
                 curve = spline.build_curve(blocks)
             except Exception as e:
-                logger.error(f"SCHEDULER: Spline failed for {product}: {e}")
+                logger.error(f"SCHEDULER: Spline failed for {product}: {e} — keeping existing curve")
                 success = False
+                continue
+
+            # Sanity check: reject flat curves (all prices identical)
+            if len(curve) > 1 and curve.max() - curve.min() < 0.01:
+                logger.warning(f"SCHEDULER: Curve for {product} is flat (${curve.iloc[0]:.2f}), keeping existing curve")
                 continue
 
             # Clear today's existing snapshots for this product
@@ -179,30 +179,6 @@ def generate_curves_from_contracts(contracts: list) -> bool:
         return False
     finally:
         session.close()
-
-
-def _build_fallback_blocks(product: str, realized: "pd.Series") -> List[ContractBlock]:
-    """
-    Build forward contract blocks from the latest realized price by
-    projecting flat forward for 12 months.  This keeps the curve
-    fresh even when the scraper returns nothing.
-    """
-    last_price = float(realized.iloc[-1])
-    today = date.today()
-    blocks = []
-
-    for i in range(1, 13):
-        month = ((today.month - 1 + i) % 12) + 1
-        year = today.year + ((today.month - 1 + i) // 12)
-        _, last_day = monthrange(year, month)
-        blocks.append(
-            ContractBlock(
-                start_date=date(year, month, 1),
-                end_date=date(year, month, last_day),
-                price=last_price,
-            )
-        )
-    return blocks
 
 
 # ---------------------------------------------------------------------------
@@ -248,8 +224,8 @@ def generate_forecast() -> bool:
             if len(realized) < 3:
                 logger.warning(f"SCHEDULER: Not enough history for {product} ({len(realized)} points), using SMA-only")
 
-            # Determine long-term mean per product
-            long_term_mean = 1500.0 if product == "NBSK" else 1100.0
+            # Determine long-term mean per product (spot-level pricing, Dec 2025+)
+            long_term_mean = 800.0 if product == "NBSK" else 620.0
 
             ensemble = EnsembleForecaster(long_term_mean=long_term_mean)
 
@@ -449,10 +425,10 @@ def create_scheduler() -> AsyncIOScheduler:
     global scheduler
     scheduler = AsyncIOScheduler(timezone="UTC")
 
-    # Daily at 18:00 UTC (after European market close)
+    # Daily at 15:00 UTC (16:00 CET, during trading hours 13:00-17:00 CET)
     scheduler.add_job(
         daily_pipeline,
-        trigger=CronTrigger(hour=18, minute=0, timezone="UTC"),
+        trigger=CronTrigger(hour=15, minute=0, timezone="UTC"),
         id="daily_pipeline",
         name="Daily: Scrape + Curve + Forecast",
         replace_existing=True,
@@ -469,7 +445,7 @@ def create_scheduler() -> AsyncIOScheduler:
         misfire_grace_time=3600,
     )
 
-    logger.info("SCHEDULER: Configured - Daily 18:00 UTC, Weekly Tue 08:00 UTC")
+    logger.info("SCHEDULER: Configured - Daily 15:00 UTC, Weekly Tue 08:00 UTC")
     return scheduler
 
 
