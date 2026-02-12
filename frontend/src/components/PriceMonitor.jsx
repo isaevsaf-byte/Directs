@@ -151,9 +151,9 @@ export const PriceMonitor = ({ product, color }) => {
 
     // Calculate Y-axis domain based on visible data
     const getYDomain = () => {
-        if (data.length === 0) return product === 'NBSK' ? [1200, 1700] : [800, 1300];
+        if (data.length === 0) return product === 'NBSK' ? [650, 900] : [500, 750];
         const allPrices = data.flatMap(d => [d.actualPrice, d.forecastPrice].filter(Boolean));
-        if (allPrices.length === 0) return product === 'NBSK' ? [1200, 1700] : [800, 1300];
+        if (allPrices.length === 0) return product === 'NBSK' ? [650, 900] : [500, 750];
         const min = Math.min(...allPrices);
         const max = Math.max(...allPrices);
         const padding = (max - min) * 0.1;

@@ -25,7 +25,7 @@ async def lifespan(app: FastAPI):
     # Startup: launch scheduler
     sched = create_scheduler()
     sched.start()
-    logger.info("Scheduler started (daily 18:00 UTC, weekly Tue 08:00 UTC)")
+    logger.info("Scheduler started (daily 15:00 UTC, weekly Tue 08:00 UTC)")
     yield
     # Shutdown: stop scheduler
     sched.shutdown(wait=False)
@@ -229,7 +229,7 @@ def get_forecast_diagnostics(
             "has_curve_data": len(latest_curve) > 0,
             "has_realized_data": latest_realized is not None,
             "price_in_range": (
-                800 <= curve_stats.get("mean", 0) <= 2500
+                400 <= curve_stats.get("mean", 0) <= 2500
                 if curve_stats.get("mean") else False
             )
         }
@@ -252,10 +252,10 @@ def save_realized_price(
     This data is used for backtesting and accuracy calculations.
     """
     # Validate price range
-    if product == "NBSK" and not (800 <= price <= 2500):
+    if product == "NBSK" and not (400 <= price <= 2500):
         raise HTTPException(
             status_code=400,
-            detail=f"NBSK price {price} outside expected range (800-2500)"
+            detail=f"NBSK price {price} outside expected range (400-2500)"
         )
 
     repo = RealizedPriceRepository(db)

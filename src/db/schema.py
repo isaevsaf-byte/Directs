@@ -120,4 +120,16 @@ engine = create_engine(DB_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def init_db():
-    Base.metadata.create_all(bind=engine)
+    import time
+    import logging
+    _logger = logging.getLogger(__name__)
+    for attempt in range(5):
+        try:
+            Base.metadata.create_all(bind=engine)
+            return
+        except Exception as e:
+            wait = 2 ** attempt
+            _logger.warning(f"init_db attempt {attempt+1}/5 failed: {e}, retrying in {wait}s...")
+            time.sleep(wait)
+    _logger.error("init_db: all 5 attempts failed, starting without DB tables")
+
