@@ -4,7 +4,6 @@ pandas
 scipy
 sqlalchemy
 psycopg2-binary
-playwright==1.40.0
 pydantic
 requests
 httpx

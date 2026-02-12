@@ -162,14 +162,18 @@ class HybridScraper:
         except Exception as e:
             logger.warning(f"HTML scrape failed: {e}")
 
-        # Strategy 3: Playwright fallback
-        try:
-            contracts = await self._fetch_via_playwright()
-            if contracts:
-                logger.info(f"Playwright scrape: {len(contracts)} contracts")
-                return contracts
-        except Exception as e:
-            logger.warning(f"Playwright scrape failed: {e}")
+        # Strategy 3: Playwright fallback (opt-in, heavy on memory)
+        import os
+        if os.environ.get("ENABLE_PLAYWRIGHT", "").lower() in ("1", "true", "yes"):
+            try:
+                contracts = await self._fetch_via_playwright()
+                if contracts:
+                    logger.info(f"Playwright scrape: {len(contracts)} contracts")
+                    return contracts
+            except Exception as e:
+                logger.warning(f"Playwright scrape failed: {e}")
+        else:
+            logger.info("Playwright scrape skipped (ENABLE_PLAYWRIGHT not set)")
 
         logger.warning("All scrape strategies returned 0 contracts")
         return []

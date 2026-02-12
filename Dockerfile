@@ -1,11 +1,10 @@
-# Use the official Playwright Python image (includes Chromium/Firefox/Webkit)
-# This is crucial: It solves the "missing browser" errors automatically.
-FROM mcr.microsoft.com/playwright/python:v1.40.0-jammy
+# Slim Python image (much lighter than Playwright base - saves ~1GB)
+FROM python:3.11-slim-bookworm
 
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies (if any extra are needed, usually covered by base image)
+# Install minimal system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
@@ -14,7 +13,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt ./
 
 # Install Python dependencies
-# No need to install playwright browsers again; the base image has them.
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
