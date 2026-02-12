@@ -31,7 +31,14 @@ const processApiData = (realizedPrices, forecastCurve, historyMonths = null) => 
         historyStartKey = `${cutoffDate.getFullYear()}-${String(cutoffDate.getMonth() + 1).padStart(2, '0')}`;
     }
 
+    // Get the first forecast price to detect regime changes
+    let firstForecastPrice = null;
+    if (forecastCurve && forecastCurve.length > 0) {
+        firstForecastPrice = forecastCurve[0].price;
+    }
+
     // Process realized prices (history)
+    // Filter out old PIX/DAP data that's on a different price basis
     if (realizedPrices && realizedPrices.length > 0) {
         realizedPrices.forEach(item => {
             const d = new Date(item.date);
@@ -42,6 +49,11 @@ const processApiData = (realizedPrices, forecastCurve, historyMonths = null) => 
 
             // Skip history older than cutoff (if set)
             if (historyStartKey && monthKey < historyStartKey) return;
+
+            // Skip history that's on a different price regime (>30% gap from forecast)
+            if (firstForecastPrice && Math.abs(item.price - firstForecastPrice) / firstForecastPrice > 0.30) {
+                return;
+            }
 
             if (!monthlyData[monthKey] || d.getDate() === 15) {
                 monthlyData[monthKey] = {
