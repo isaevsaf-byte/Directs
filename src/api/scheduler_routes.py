@@ -95,3 +95,45 @@ async def _run_scrape():
 
 def _run_curves():
     generate_curves_from_contracts([])  # empty = use DB fallback
+
+
+@router.post("/inject/contracts")
+async def inject_contracts(contracts: list, background_tasks: BackgroundTasks):
+    """
+    Inject contract data manually and generate curves + forecast.
+    Useful when scraper can't run (outside trading hours).
+
+    Body: list of {product_type, contract_date, period_type, price}
+    """
+    from src.etl.models import MarketContract
+    from datetime import date as date_type
+
+    logger.info(f"SCHEDULER: Manual contract injection: {len(contracts)} contracts")
+
+    parsed = []
+    for c in contracts:
+        try:
+            cd = c["contract_date"]
+            if isinstance(cd, str):
+                cd = date_type.fromisoformat(cd)
+            mc = MarketContract(
+                ticker=f"{c['product_type']}-MANUAL",
+                product_type=c["product_type"],
+                contract_date=cd,
+                period_type=c.get("period_type", "Monthly"),
+                price=float(c["price"]),
+            )
+            parsed.append(mc)
+        except Exception as e:
+            logger.warning(f"Skipping invalid contract: {c} — {e}")
+
+    if not parsed:
+        return {"status": "error", "message": "No valid contracts parsed"}
+
+    # Run curve generation + forecast in background
+    def _run():
+        generate_curves_from_contracts(parsed)
+        generate_forecast()
+
+    background_tasks.add_task(_run)
+    return {"status": "triggered", "message": f"Injected {len(parsed)} contracts, generating curves + forecast"}
