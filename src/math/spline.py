@@ -86,79 +86,43 @@ class MaximumSmoothnessSpline:
 
         logger.info(f"Curve spans {days_total} days from {self.spot_date} to {max_date}")
 
-        # 2. Optimization Setup
-        # Variable x: Daily prices from T=0 to T=End
-        # We start with a flat guess equal to spot
-        x0 = np.full(days_total, self.spot_price)
+        # 2. Build knot points from contract midpoints + spot
+        from scipy.interpolate import CubicSpline
 
-        # 3. Objective Function: Minimize Curvature (Squared Second Derivative)
-        # sum((x[t] - 2*x[t-1] + x[t-2])^2)
-        def objective(x):
-            # Discrete 2nd derivative: [1, -2, 1] convolution
-            diff2 = x[:-2] - 2*x[1:-1] + x[2:]
-            return np.sum(diff2**2)
+        knot_days = [0]  # spot date
+        knot_prices = [self.spot_price]
 
-        # 4. Constraints
-        constraints = []
+        for contract in contracts:
+            # Use contract midpoint as knot
+            start_idx = max(0, (contract.start_date - self.spot_date).days)
+            end_idx = min(days_total - 1, (contract.end_date - self.spot_date).days)
 
-        # Constraint A: Curve must start at Spot Price
-        # x[0] == spot_price
-        constraints.append({
-            'type': 'eq',
-            'fun': lambda x: x[0] - self.spot_price
-        })
-
-        # Constraint B: Arbitrage-Free (Average of daily values in period == Contract Price)
-        # Note: In commodity markets, usually arithmetic average for swaps/futures settlement.
-        for contact in contracts:
-            # Find indices for this contract's period
-            start_idx = (contact.start_date - self.spot_date).days
-            end_idx = (contact.end_date - self.spot_date).days
-
-            # Clip contracts that overlap the spot date (e.g., current month)
             if end_idx < 0 or start_idx >= days_total:
-                logger.warning(f"Contract {contact} entirely out of range, skipping")
+                logger.warning(f"Contract {contract} entirely out of range, skipping")
                 continue
-            if start_idx < 0:
-                logger.info(f"Clipping contract {contact.start_date}-{contact.end_date} start from idx {start_idx} to 0")
-                start_idx = 0
-            if end_idx >= days_total:
-                end_idx = days_total - 1
 
-            # Helper to capture closure variables
-            def make_constraint(s_idx, e_idx, target_price):
-                # Using e_idx + 1 because python slice is exclusive at end
-                return lambda x: np.mean(x[s_idx : e_idx + 1]) - target_price
+            mid_idx = (start_idx + end_idx) // 2
+            if mid_idx > 0 and mid_idx not in knot_days:  # avoid duplicate at 0
+                knot_days.append(mid_idx)
+                knot_prices.append(contract.price)
 
-            constraints.append({
-                'type': 'eq',
-                'fun': make_constraint(start_idx, end_idx, contact.price)
-            })
+        # Add final point if not already there
+        if knot_days[-1] != days_total - 1:
+            knot_days.append(days_total - 1)
+            knot_prices.append(knot_prices[-1])  # hold last price flat
 
-        # 5. Set up bounds for each day
-        # This prevents the optimizer from generating unrealistic prices
-        price_bounds = [
-            (self.bounds.min_price, self.bounds.max_price)
-            for _ in range(days_total)
-        ]
+        knot_days = np.array(knot_days, dtype=float)
+        knot_prices = np.array(knot_prices, dtype=float)
 
-        # 6. Run Optimization
-        # SLSQP is good for equality constraints
-        result = minimize(
-            objective,
-            x0,
-            constraints=constraints,
-            bounds=price_bounds,
-            method='SLSQP',
-            options={'ftol': 1e-6, 'maxiter': 2000}
-        )
+        # 3. Cubic spline interpolation (natural boundary conditions)
+        cs = CubicSpline(knot_days, knot_prices, bc_type='natural')
+        all_days = np.arange(days_total)
+        curve = cs(all_days)
 
-        if not result.success:
-            logger.error(f"Spline optimization failed: {result.message}")
-            raise ValueError(f"Spline optimization failed: {result.message}")
+        # 4. Clamp to bounds
+        curve = np.clip(curve, self.bounds.min_price, self.bounds.max_price)
 
-        # 7. Post-optimization validation
-        curve = result.x
+        logger.info(f"Cubic spline built in <1s with {len(knot_days)} knots")
         daily_changes = np.abs(np.diff(curve))
         max_change = daily_changes.max() if len(daily_changes) > 0 else 0
 
