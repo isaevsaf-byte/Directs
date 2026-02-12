@@ -7,7 +7,7 @@ Provides endpoints to:
 """
 import asyncio
 import logging
-from fastapi import APIRouter, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, Body
 
 from src.scheduler import (
     get_scheduler_status,
@@ -98,7 +98,7 @@ def _run_curves():
 
 
 @router.post("/inject/contracts")
-async def inject_contracts(contracts: list, background_tasks: BackgroundTasks):
+async def inject_contracts(background_tasks: BackgroundTasks, contracts: list = Body(...)):
     """
     Inject contract data manually and generate curves + forecast.
     Useful when scraper can't run (outside trading hours).
