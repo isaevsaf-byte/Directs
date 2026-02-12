@@ -109,10 +109,15 @@ class MaximumSmoothnessSpline:
             start_idx = (contact.start_date - self.spot_date).days
             end_idx = (contact.end_date - self.spot_date).days
 
-            # Validate indices
-            if start_idx < 0 or end_idx >= days_total:
-                logger.warning(f"Contract {contact} indices out of range, skipping")
+            # Clip contracts that overlap the spot date (e.g., current month)
+            if end_idx < 0 or start_idx >= days_total:
+                logger.warning(f"Contract {contact} entirely out of range, skipping")
                 continue
+            if start_idx < 0:
+                logger.info(f"Clipping contract {contact.start_date}-{contact.end_date} start from idx {start_idx} to 0")
+                start_idx = 0
+            if end_idx >= days_total:
+                end_idx = days_total - 1
 
             # Helper to capture closure variables
             def make_constraint(s_idx, e_idx, target_price):
@@ -139,7 +144,7 @@ class MaximumSmoothnessSpline:
             constraints=constraints,
             bounds=price_bounds,
             method='SLSQP',
-            options={'ftol': 1e-9, 'maxiter': 1000}
+            options={'ftol': 1e-6, 'maxiter': 5000}
         )
 
         if not result.success:
