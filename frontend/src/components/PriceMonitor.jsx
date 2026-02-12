@@ -81,25 +81,43 @@ const processApiData = (realizedPrices, forecastCurve, historyMonths = null) => 
             }
         });
 
-        Object.entries(monthlyForecast).forEach(([monthKey, { date: itemDate, price }]) => {
+        // Sort forecast entries so current month comes first
+        const sortedForecastEntries = Object.entries(monthlyForecast).sort(([a], [b]) => a.localeCompare(b));
+        let isFirstForecastPoint = true;
+
+        sortedForecastEntries.forEach(([monthKey, { date: itemDate, price }]) => {
             const d = new Date(itemDate);
+            const roundedPrice = Math.round(price);
 
             if (!monthlyData[monthKey]) {
                 monthlyData[monthKey] = {
                     date: formatDate(itemDate),
-                    type: 'forecast',
-                    actualPrice: null,
-                    forecastPrice: Math.round(price),
+                    type: isFirstForecastPoint ? 'bridge' : 'forecast',
+                    // First forecast point acts as both actual and forecast (bridge)
+                    actualPrice: isFirstForecastPoint ? roundedPrice : null,
+                    forecastPrice: roundedPrice,
                     timestamp: d.getTime()
                 };
             } else if (monthlyData[monthKey].type === 'actual') {
-                monthlyData[monthKey].forecastPrice = Math.round(price);
+                monthlyData[monthKey].forecastPrice = roundedPrice;
             }
+            isFirstForecastPoint = false;
         });
     }
 
     const data = Object.values(monthlyData);
     data.sort((a, b) => a.timestamp - b.timestamp);
+
+    // Ensure there's a connecting point between history and forecast
+    // If we have actuals and forecasts, the last actual should also have the forecast value
+    // and the first forecast should also have the actual value
+    const lastActualIdx = data.map(d => d.type === 'actual').lastIndexOf(true);
+    const firstForecastIdx = data.findIndex(d => d.type === 'forecast' || d.type === 'bridge');
+    if (lastActualIdx >= 0 && firstForecastIdx >= 0 && firstForecastIdx - lastActualIdx === 1) {
+        // Bridge: give the last actual a forecast value so lines connect
+        data[lastActualIdx].forecastPrice = data[lastActualIdx].actualPrice;
+    }
+
     return data;
 };
 
