@@ -75,6 +75,12 @@ class MaximumSmoothnessSpline:
         contracts = sorted(contracts, key=lambda x: x.start_date)
         max_date = max(c.end_date for c in contracts)
 
+        # Cap curve at 400 days to keep optimization tractable on limited resources
+        max_horizon = self.spot_date + timedelta(days=400)
+        if max_date > max_horizon:
+            logger.info(f"Capping curve from {max_date} to {max_horizon} (400-day limit)")
+            max_date = max_horizon
+
         days_total = (max_date - self.spot_date).days + 1
         date_range = [self.spot_date + timedelta(days=i) for i in range(days_total)]
 
@@ -144,7 +150,7 @@ class MaximumSmoothnessSpline:
             constraints=constraints,
             bounds=price_bounds,
             method='SLSQP',
-            options={'ftol': 1e-6, 'maxiter': 5000}
+            options={'ftol': 1e-6, 'maxiter': 2000}
         )
 
         if not result.success:
