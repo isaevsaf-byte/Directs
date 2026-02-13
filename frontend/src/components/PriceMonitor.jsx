@@ -215,7 +215,7 @@ export const PriceMonitor = ({ product, color }) => {
                         {loading && <span className="ml-2 text-sm text-gray-400">Loading...</span>}
                     </h2>
                     <p className="text-xs text-gray-500 uppercase tracking-wide">
-                        {product === 'NBSK' ? 'Softwood (DAP Europe)' : 'Hardwood/Eucalyptus (Europe)'}
+                        {product === 'NBSK' ? 'Softwood Kraft Pulp (Norexco Spot)' : 'Hardwood/Eucalyptus Kraft Pulp (Norexco Spot)'}
                     </p>
                     {error && <p className="text-xs text-amber-600 mt-1">{error}</p>}
                 </div>
