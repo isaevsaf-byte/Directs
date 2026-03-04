@@ -22,14 +22,22 @@ init_db()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: launch scheduler
-    sched = create_scheduler()
-    sched.start()
-    logger.info("Scheduler started (daily 15:00 UTC, weekly Tue 08:00 UTC)")
+    # Startup: launch scheduler (wrapped in try/except so app always starts)
+    sched = None
+    try:
+        sched = create_scheduler()
+        sched.start()
+        logger.info("Scheduler started (daily 15:00 UTC, weekly Tue 08:00 UTC)")
+    except Exception as e:
+        logger.error(f"Scheduler failed to start: {e} — app will run without scheduler")
     yield
-    # Shutdown: stop scheduler
-    sched.shutdown(wait=False)
-    logger.info("Scheduler stopped")
+    # Shutdown: stop scheduler if running
+    if sched is not None:
+        try:
+            sched.shutdown(wait=False)
+            logger.info("Scheduler stopped")
+        except Exception:
+            pass
 
 
 app = FastAPI(

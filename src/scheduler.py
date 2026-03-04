@@ -13,14 +13,10 @@ from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional
 from calendar import monthrange
 
+# Heavy imports are deferred to function bodies to reduce startup memory.
+# Only APScheduler is imported at module level (lightweight).
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-
-from src.db.schema import init_db, SessionLocal, MarketSnapshot
-from src.db.access import MarketRepository, RealizedPriceRepository, ForecastRepository
-from src.etl.scraper import HybridScraper
-from src.math.spline import MaximumSmoothnessSpline, ContractBlock, SplineBounds, create_blocks_from_market_contracts
-from sqlalchemy import delete
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +56,8 @@ def get_last_run(job_name: str) -> Optional[Dict]:
 # ---------------------------------------------------------------------------
 async def scrape_norexco() -> List:
     """Scrape latest contracts from Norexco market-view."""
+    from src.etl.scraper import HybridScraper
+
     logger.info("SCHEDULER: Starting Norexco scrape...")
     _record("scrape_norexco", "running")
 
@@ -92,6 +90,11 @@ def generate_curves_from_contracts(contracts: list) -> bool:
     and save to the database.  Falls back to the latest DB curve if
     the scrape returned nothing.
     """
+    from src.db.schema import init_db, SessionLocal, MarketSnapshot
+    from src.db.access import MarketRepository, RealizedPriceRepository
+    from src.math.spline import MaximumSmoothnessSpline, ContractBlock, SplineBounds, create_blocks_from_market_contracts
+    from sqlalchemy import delete
+
     logger.info("SCHEDULER: Generating forward curves...")
     _record("generate_curves", "running")
 
@@ -189,6 +192,9 @@ def generate_forecast() -> bool:
     Run the ensemble forecaster and store predictions in the
     fact_forecast_accuracy table for later backtesting.
     """
+    from src.db.schema import init_db, SessionLocal
+    from src.db.access import MarketRepository, RealizedPriceRepository, ForecastRepository
+
     logger.info("SCHEDULER: Generating ensemble forecast...")
     _record("generate_forecast", "running")
 
@@ -285,9 +291,10 @@ def generate_forecast() -> bool:
         session.close()
 
 
-def _curve_to_blocks(curve_snapshots: list) -> List[ContractBlock]:
+def _curve_to_blocks(curve_snapshots: list) -> list:
     """Group daily curve snapshots into monthly ContractBlocks."""
     from collections import defaultdict
+    from src.math.spline import ContractBlock
 
     monthly: Dict[tuple, list] = defaultdict(list)
     for s in curve_snapshots:
@@ -316,6 +323,9 @@ def validate_forecasts_against_actuals() -> int:
     Check if any pending forecasts can now be validated against
     realized PIX prices, and update accuracy metrics.
     """
+    from src.db.schema import init_db, SessionLocal
+    from src.db.access import ForecastRepository, RealizedPriceRepository
+
     logger.info("SCHEDULER: Validating forecasts against actuals...")
     _record("validate_forecasts", "running")
 
